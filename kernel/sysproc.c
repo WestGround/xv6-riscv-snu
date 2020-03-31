@@ -7,6 +7,8 @@
 #include "spinlock.h"
 #include "proc.h"
 
+extern struct proc proc[NPROC];
+
 uint64
 sys_exit(void)
 {
@@ -94,4 +96,57 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// PA2
+uint64
+sys_setpgid(void)
+{
+  struct proc *p;
+  int pid, pgid;
+
+  if(argint(0, &pid) < 0 || argint(1, &pgid) < 0)
+    return -1;
+  if(pid == 0)
+    pid = myproc()->pid;
+  if(pgid == 0)
+    pgid = pid;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->pid == pid) {
+      p->pgid = pgid;
+      release(&p->lock);
+      return 0;
+    } else {
+      release(&p->lock);
+    }
+  }
+
+  return -1;	// reached if process of PID not exist
+}
+
+uint64
+sys_getpgid(void)
+{
+  struct proc *p;
+  int pid, pgid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  if(pid == 0)
+    return myproc()->pgid;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->pid == pid) {
+      pgid = p->pgid;
+      release(&p->lock);
+      return pgid;
+    } else {
+      release(&p->lock);
+    }
+  }
+
+  return -1;	// reached if process of PID not exist
 }
