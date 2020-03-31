@@ -137,6 +137,7 @@ freeproc(struct proc *p)
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
+  p->pgid = 0;		//PA2
   p->parent = 0;
   p->name[0] = 0;
   p->chan = 0;
@@ -200,6 +201,7 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
+  p->pgid = 1;	//PA2
   
   // allocate one user page and copy init's instructions
   // and data into it.
@@ -277,6 +279,8 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+
+  pgid = p->pgid;	//PA2
 
   np->state = RUNNABLE;
 
@@ -667,7 +671,7 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    printf("%d %s %s", p->pid, state, p->name);
+    printf("%d %d %s %s", p->pid, p->pgid, state, p->name);
     printf("\n");
   }
 }
