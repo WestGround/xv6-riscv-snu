@@ -104,6 +104,7 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->pgid = (p->pid == 1) ? 1 : myproc()->pgid;	//PA2
 
   // Allocate a trapframe page.
   if((p->tf = (struct trapframe *)kalloc()) == 0){
@@ -201,7 +202,6 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
-  p->pgid = 1;	//PA2
   
   // allocate one user page and copy init's instructions
   // and data into it.
@@ -279,8 +279,6 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-
-  pgid = p->pgid;	//PA2
 
   np->state = RUNNABLE;
 
