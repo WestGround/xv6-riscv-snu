@@ -105,7 +105,7 @@ sys_setpgid(void)
   struct proc *p;
   int pid, pgid;
 
-  if(argint(0, &pid) < 0 || argint(1, &pgid) < 0)
+  if(argint(0, &pid) < 0 || argint(1, &pgid) < 0 || pid < 0 || pgid < 0)
     return -1;
   if(pid == 0)
     pid = myproc()->pid;
@@ -132,7 +132,7 @@ sys_getpgid(void)
   struct proc *p;
   int pid, pgid;
 
-  if(argint(0, &pid) < 0)
+  if(argint(0, &pid) < 0 || pid < 0)
     return -1;
   if(pid == 0)
     return myproc()->pgid;
