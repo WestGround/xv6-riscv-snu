@@ -599,18 +599,37 @@ kill(int pid)
 {
   struct proc *p;
 
-  for(p = proc; p < &proc[NPROC]; p++){
-    acquire(&p->lock);
-    if(p->pid == pid){
-      p->killed = 1;
-      if(p->state == SLEEPING){
-        // Wake process from sleep().
-        p->state = RUNNABLE;
+  if(pid > 0)
+    for(p = proc; p < &proc[NPROC]; p++){
+     acquire(&p->lock);
+     if(p->pid == pid){
+       p->killed = 1;
+       if(p->state == SLEEPING){
+         // Wake process from sleep().
+         p->state = RUNNABLE;
+       }
+       release(&p->lock);
+       return 0;
+     }
+     release(&p->lock);
+   }
+  
+  else {
+    int killed = 0;
+    int pgid = (pid == 0) ? (myproc()->pgid) : (-1)*pid;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->pgid == pgid) {
+        killed = 1;
+        p->killed = 1;
+        if(p->state == SLEEPING) {
+          p->state = RUNNABLE;
+        }
       }
       release(&p->lock);
-      return 0;
     }
-    release(&p->lock);
+    if(killed == 1)
+      return 0;
   }
   return -1;
 }
