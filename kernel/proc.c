@@ -692,3 +692,20 @@ procdump(void)
     printf("\n");
   }
 }
+
+int
+kill_fgprocs(void) {
+  struct proc *p, *pp;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    pp = p->parent;
+    if(pp && pp->pid == 2) {
+      release(&p->lock);
+      kill((-1)*(p->pid));
+      return 0;
+    }
+    release(&p->lock);
+  }
+  return -1;
+}

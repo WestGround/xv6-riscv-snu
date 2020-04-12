@@ -155,6 +155,9 @@ consoleintr(int c)
       consputc(BACKSPACE);
     }
     break;
+  case C('C'): // PA3
+    kill_fgprocs();
+    break;
   case C('H'): // Backspace
   case '\x7f':
     if(cons.e != cons.w){
