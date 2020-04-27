@@ -100,18 +100,11 @@ sys_uptime(void)
 uint64
 sys_nice(void)
 {
-  // PA4: Fill here!
+  int pid, inc;
 
-
-
-
-
-
-
-
-
-
-  return -1;
+  if(argint(0, &pid) < 0 || argint(1, &inc) < 0)
+    return -1;
+  return nice(pid, inc);
 }
 
 uint64

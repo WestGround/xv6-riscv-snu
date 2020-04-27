@@ -144,6 +144,7 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
 #ifdef SNU
+  p->nice = 0;
   p->ticks = 0;
 #endif
 }
@@ -679,6 +680,32 @@ procdump(void)
 }
 
 #ifdef SNU
+int
+nice(int pid, int inc)
+{
+  struct proc *p;
+  int nice, valid = -1;
+  if(pid < 0)
+    return -1;
+  else if(pid == 0)
+    pid = myproc()->pid;
+  
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&pid_lock);
+    if (p->pid == pid) {
+      nice = (p->nice) + inc;
+      if ((nice>=-20) && (nice<=19)) {
+        p->nice = nice;
+        valid = 0;
+      }
+      release(&pid_lock);
+      return valid;
+    }
+    release(&pid_lock);
+  }
+  return -1;  // no valid process of given pid
+}
+
 int
 getticks(int pid)
 {
