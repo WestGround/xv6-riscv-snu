@@ -106,6 +106,7 @@ found:
   p->pid = allocpid();
   p->counter = 0;
   p->ticks = 0;
+  p->nice = 0;
 
   // Allocate a trapframe page.
   if((p->tf = (struct trapframe *)kalloc()) == 0){
@@ -207,10 +208,6 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
-  
-  p->nice = 0;  //PA4
-  p->counter = 0;
-  p->ticks = 0;
 
   // allocate one user page and copy init's instructions
   // and data into it.
