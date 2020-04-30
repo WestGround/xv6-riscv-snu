@@ -104,6 +104,8 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->counter = 0;
+  p->ticks = 0;
 
   // Allocate a trapframe page.
   if((p->tf = (struct trapframe *)kalloc()) == 0){
@@ -145,6 +147,7 @@ freeproc(struct proc *p)
   p->state = UNUSED;
 #ifdef SNU
   p->nice = 0;
+  p->counter = 0; // PA4
   p->ticks = 0;
 #endif
 }
@@ -205,6 +208,10 @@ userinit(void)
   p = allocproc();
   initproc = p;
   
+  p->nice = 0;  //PA4
+  p->counter = 0;
+  p->ticks = 0;
+
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
@@ -247,7 +254,7 @@ growproc(int n)
 int
 fork(void)
 {
-  int i, pid;
+  int i, pid, newcount;
   struct proc *np;
   struct proc *p = myproc();
 
@@ -262,6 +269,7 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
   np->sz = p->sz;
 
   np->parent = p;
@@ -281,6 +289,13 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+
+  newcount = (p->counter + 1) >> 1;
+  p->counter = (p->counter) >> 1;
+
+  np->ticks = 0;
+  np->counter = newcount;
+  np->nice = p->nice;
 
   np->state = RUNNABLE;
 
@@ -445,30 +460,58 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p, *next;
   struct cpu *c = mycpu();
+  int max_goodness = 0;
+  int goodness, no_runnable;
   
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
+    
+    max_goodness = 0;
+    no_runnable = 1;
+    /* Find next process to run */
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->scheduler, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+      if(p->state != RUNNABLE) {
+        release(&p->lock);
+        continue;
+      }
+      no_runnable = 0;
+      if(p->counter != 0) {   // remaining time slice exists
+        goodness = p->counter + (20 - p->nice);
+        if(max_goodness < goodness) {
+          max_goodness = goodness;
+          next = p;
+        }
       }
       release(&p->lock);
     }
+    
+    if(no_runnable)   // busy waits in the current epoch
+      continue;
+
+    if(max_goodness !=0) {  // schedule next runnable process
+      acquire(&next->lock);
+      next->state = RUNNING;
+      c->proc = next;
+      swtch(&c->scheduler, &next->context);
+
+      c->proc = 0;
+      release(&next->lock);
+    } else {  // moves to the next epoch
+      /* redistributes time slices for all processes */
+      for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE)
+          p->counter = ((20-(p->nice)) >> 2) + 1;
+        else if(p->state == SLEEPING)
+          p->counter = (p->counter >> 1) + ((20-(p->nice)) >> 2) + 1;
+        release(&p->lock);
+      }
+    } 
   }
 }
 
@@ -505,10 +548,16 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  p->state = RUNNABLE;
+  /* increment ticks used, decrement counter */
 #ifdef SNU
   p->ticks++;
+  p->counter--;
+  if(p->counter != 0) { // time slice not exhausted
+    release(&p->lock);
+    return;
+  }
 #endif
+  p->state = RUNNABLE;
   sched();
   release(&p->lock);
 }
@@ -691,17 +740,17 @@ nice(int pid, int inc)
     pid = myproc()->pid;
   
   for(p = proc; p < &proc[NPROC]; p++) {
-    acquire(&pid_lock);
+    acquire(&p->lock);
     if (p->pid == pid) {
       nice = (p->nice) + inc;
       if ((nice>=-20) && (nice<=19)) {
         p->nice = nice;
         valid = 0;
       }
-      release(&pid_lock);
+      release(&p->lock);
       return valid;
     }
-    release(&pid_lock);
+    release(&p->lock);
   }
   return -1;  // no valid process of given pid
 }
@@ -710,15 +759,25 @@ int
 getticks(int pid)
 {
   struct proc *p;
+  int tick;
 
-  if (pid == 0)
-    return myproc()->ticks;
+  if (pid == 0) {
+    p = myproc();
+    acquire(&p->lock);
+    tick = p->ticks;
+    release(&p->lock);
+    return tick;
+  }
 
-  // We don't need an accurate value.
-  // So, we read the ticks without acquiring a lock.
-  for (p = proc; p < &proc[NPROC]; p++)
-    if (p->pid == pid)
-      return p->ticks;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->pid == pid) {
+      tick = p->ticks;
+      release(&p->lock);
+      return tick;
+    }
+    release(&p->lock);
+  }
   return -1;
 }
 #endif
