@@ -7,6 +7,7 @@
 #include "fs.h"
 #include "spinlock.h"
 
+#include "proc.h"
 /*
  * the kernel's page table.
  */
@@ -36,7 +37,7 @@ kvminit()
   for(i=0; i < PGNUM; i++) {
     acquire(&pgreference.lock);
     pgreference.ref[i] = 0;
-    releaseE(&pgreference.lock);
+    release(&pgreference.lock);
   }
 
   kernel_pagetable = (pagetable_t) kalloc();
@@ -344,7 +345,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -353,18 +354,16 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if(flags&PTE_W) { // for writable page, allocate new physical page
-      if((mem = kalloc()) == 0)
+    
+    if(flags&PTE_W) { // for writable page, map both PTE as read-only
+      *pte = *pte & ~PTE_W;
+      if(mappages(new, i, PGSIZE, pa, flags&~PTE_W) != 0)
         goto err;
-      memmove(mem, (char*)pa, PGSIZE);
-      if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-        kfree(mem);
-        goto err;
-      }
     }
-    else  // for readonly page, simply add map
+    else  {// for readonly page, simply add map
       if(mappages(new, i, PGSIZE, pa, flags) != 0)
         goto err;
+    }
   }
   return 0;
 
@@ -477,6 +476,31 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int
+cowpage(pagetable_t pagetable, uint64 va)
+{
+  pte_t *pte;
+  uint64 a, pa;
+  uint flags;
+  char *mem;
+
+  a = PGROUNDDOWN(va);
+  if((pte = walk(pagetable, a, 0)) == 0)
+    return -1;
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+
+  uvmunmap(pagetable, a, PGSIZE, 0);
+  if((mem = kalloc()) == 0)
+    return -1;
+  memmove(mem, (char*)pa, PGSIZE);
+  if(mappages(pagetable, a, PGSIZE, (uint64)mem, flags|PTE_W) != 0) {
+    kfree(mem);
+    return -1;
+  }
+  return 0;
 }
 
 #ifdef SNU

@@ -80,6 +80,12 @@ usertrap(void)
   if(which_dev == 2)
     yield();
 
+  // PA5 : Allocate new physical frame
+  if(which_dev == 3) {
+    if(cowpage(p->pagetable, r_stval()) != 0)
+      panic("Copy on write");
+  }
+
   usertrapret();
 }
 
@@ -137,6 +143,7 @@ kerneltrap()
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
+  uint64 stval = r_stval();
   
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
@@ -152,6 +159,12 @@ kerneltrap()
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
+
+  // PA5 : Allocate new physical frame
+  if(which_dev == 3) {
+    if(cowpage(myproc()->pagetable, stval) != 0)
+      panic("Copy on write");
+  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.
@@ -206,6 +219,9 @@ devintr()
     w_sip(r_sip() & ~2);
 
     return 2;
+  } else if(scause == 0x000000000000000cL || scause == 0x000000000000000dL ||
+            scause == 0x000000000000000fL) {
+    return 3;
   } else {
     return 0;
   }
