@@ -5,11 +5,17 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
 
 /*
  * the kernel's page table.
  */
 pagetable_t kernel_pagetable;
+
+struct {  // PA5
+  struct spinlock lock;
+  int ref[PGNUM];
+} pgreference;
 
 extern char etext[];  // kernel.ld sets this to end of kernel code.
 
@@ -23,6 +29,16 @@ extern char trampoline[]; // trampoline.S
 void
 kvminit()
 {
+  // PA5 : initialize page reference
+  int i;
+  initlock(&pgreference.lock, "pgreference");
+
+  for(i=0; i < PGNUM; i++) {
+    acquire(&pgreference.lock);
+    pgreference.ref[i] = 0;
+    releaseE(&pgreference.lock);
+  }
+
   kernel_pagetable = (pagetable_t) kalloc();
   memset(kernel_pagetable, 0, PGSIZE);
 
@@ -161,6 +177,9 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     if(*pte & PTE_V)
       panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
+    acquire(&pgreference.lock);
+    (pgreference.ref[PGINDEX(pa)])++;
+    release(&pgreference.lock);
     if(a == last)
       break;
     a += PGSIZE;
@@ -190,10 +209,14 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
     }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
-      pa = PTE2PA(*pte);
+
+    pa = PTE2PA(*pte);
+    acquire(&pgreference.lock);
+    (pgreference.ref[PGINDEX(pa)])--;
+    do_free = (pgreference.ref[PGINDEX(pa)] == 0) ? do_free : 0;
+    release(&pgreference.lock);
+    if(do_free)
       kfree((void*)pa);
-    }
     *pte = 0;
     if(a == last)
       break;
@@ -233,7 +256,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 // Allocate PTEs and physical memory to grow process from oldsz to
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 uint64
-uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
+uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, uint64 flags)
 {
   char *mem;
   uint64 a;
@@ -250,7 +273,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+    if(mappages(pagetable, a, PGSIZE, (uint64)mem, flags) != 0){
       kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
       return 0;
@@ -330,13 +353,18 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
-      goto err;
+    if(flags&PTE_W) { // for writable page, allocate new physical page
+      if((mem = kalloc()) == 0)
+        goto err;
+      memmove(mem, (char*)pa, PGSIZE);
+      if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
+        kfree(mem);
+        goto err;
+      }
     }
+    else  // for readonly page, simply add map
+      if(mappages(new, i, PGSIZE, pa, flags) != 0)
+        goto err;
   }
   return 0;
 
