@@ -492,7 +492,7 @@ cowpage(pagetable_t pagetable, uint64 va)
   pa = PTE2PA(*pte);
   flags = PTE_FLAGS(*pte);
 
-  uvmunmap(pagetable, a, PGSIZE, 0);
+  uvmunmap(pagetable, a, PGSIZE, 1);
   if((mem = kalloc()) == 0)
     return -1;
   memmove(mem, (char*)pa, PGSIZE);
