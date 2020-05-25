@@ -37,6 +37,7 @@ void
 usertrap(void)
 {
   int which_dev = 0;
+  int cow = 0;
 
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
@@ -80,12 +81,17 @@ usertrap(void)
   if(which_dev == 2)
     yield();
 
-  if(which_dev == 3)
-    if(copyonwrite(p->pagetable, r_stval()) != 0) {
+  if(which_dev == 3) {
+    cow = copyonwrite(p->pagetable, r_stval());
+    if(cow == -1) {
       printf("scause=%p pid=%d\n", r_scause(), p->pid);
       printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
       panic("usertrap");
+    } else if (cow == -2) {
+      p->killed = 1;
+      exit(-1);
     }
+  }
 
   usertrapret();
 }
