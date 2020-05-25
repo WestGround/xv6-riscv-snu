@@ -64,6 +64,7 @@ void            kfree(void *);
 void            kinit();
 void            incrementref(uint64);
 void            decrementref(uint64);
+int             getref(uint64);
 #ifdef SNU
 extern uint64   freemem;
 #endif

@@ -469,6 +469,11 @@ copyonwrite(pagetable_t pagetable, uint64 va) {
   pa = PTE2PA(*pte);
   flags = PTE_FLAGS(*pte);
 
+  if(getref(pa) == 1) {
+    *pte = *pte | PTE_W;
+    return 0;
+  }
+
   if((mem = kalloc()) == 0)
     return -1;
   memmove(mem, (char*)pa, PGSIZE);

@@ -122,3 +122,12 @@ decrementref(uint64 pa) {
   kmem.pgref[PGINDEX(pa)]--;
   release(&kmem.lock);
 }
+
+int
+getref(uint64 pa) {
+  int ref;
+  acquire(&kmem.lock);
+  ref = kmem.pgref[PGINDEX(pa)];
+  release(&kmem.lock);
+  return ref;
+}
