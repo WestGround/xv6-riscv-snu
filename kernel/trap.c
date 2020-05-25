@@ -85,7 +85,7 @@ usertrap(void)
       printf("scause=%p pid=%d\n", r_scause(), p->pid);
       printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
       panic("usertrap");
-  }
+    }
 
   usertrapret();
 }
@@ -165,7 +165,7 @@ kerneltrap()
       printf("scause %p\n", scause);
       printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
       panic("kerneltrap");
-  }
+    }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.

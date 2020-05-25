@@ -62,7 +62,7 @@ kfree(void *pa)
 
   acquire(&kmem.lock);
   if(kmem.pgref[PGINDEX(pa)] < 0)
-    panic("kfree2");
+    panic("kfree");
 
   kmem.pgref[PGINDEX(pa)]--;
   if(kmem.pgref[PGINDEX(pa)] == 0) {
@@ -92,13 +92,13 @@ kalloc(void)
   if(r)
 #ifdef SNU
   {
-    kmem.pgref[PGINDEX(r)] = 1;
+    kmem.pgref[PGINDEX(r)] = 0;
     kmem.freelist = r->next;
     freemem--;
   }
 #else
   {
-    kmem.pgref[PGINDEX(r)] = 1;
+    kmem.pgref[PGINDEX(r)] = 0;
     kmem.freelist = r->next;
   }
 #endif

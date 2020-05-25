@@ -83,6 +83,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     } else {
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
+      incrementref((uint64)pagetable);
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;
     }
@@ -167,6 +168,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     a += PGSIZE;
     pa += PGSIZE;
   }
+
   return 0;
 }
 
@@ -210,6 +212,7 @@ uvmcreate()
 {
   pagetable_t pagetable;
   pagetable = (pagetable_t) kalloc();
+  incrementref((uint64)pagetable);
   if(pagetable == 0)
     panic("uvmcreate: out of memory");
   memset(pagetable, 0, PGSIZE);
@@ -337,7 +340,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if(mappages(new, i, PGSIZE, pa, flags) != 0) {
       goto err;
     }
-    incrementref(pa);
   }
   return 0;
 
