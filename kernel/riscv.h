@@ -323,6 +323,7 @@ sfence_vma()
 
 #define PGSIZE 4096 // bytes per page
 #define PGSHIFT 12  // bits of offset within a page
+#define PGNUM (PHYSTOP) >> (PGSHIFT)
 
 #define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
 #define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))
@@ -335,6 +336,8 @@ sfence_vma()
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
+
+#define PGINDEX(pa) ((uint64)(pa) >> 12)
 
 #define PTE2PA(pte) (((pte) >> 10) << 12)
 

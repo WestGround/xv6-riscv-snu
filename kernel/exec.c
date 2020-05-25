@@ -13,7 +13,7 @@ int
 exec(char *path, char **argv)
 {
   char *s, *last;
-  int i, off;
+  int i, off, flags;
   uint64 argc, sz, sp, ustack[MAXARG+1], stackbase;
   struct elfhdr elf;
   struct inode *ip;
@@ -49,7 +49,10 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr + ph.memsz < ph.vaddr)
       goto bad;
-    if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0)
+    flags = (ph.flags & (1<<2)) ? PTE_R : 0;
+    flags = flags | ((ph.flags & (1<<1)) ? PTE_W : 0);
+    flags = flags | ((ph.flags & (1<<0)) ? PTE_X : 0);
+    if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags|PTE_U)) == 0)
       goto bad;
 #ifndef SNU
     if(ph.vaddr % PGSIZE != 0)
@@ -68,7 +71,7 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  if((sz = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
+  if((sz = uvmalloc(pagetable, sz, sz + 2*PGSIZE, PTE_R|PTE_W|PTE_U)) == 0)
     goto bad;
   uvmclear(pagetable, sz-2*PGSIZE);
   sp = sz;

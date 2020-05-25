@@ -80,6 +80,13 @@ usertrap(void)
   if(which_dev == 2)
     yield();
 
+  if(which_dev == 3)
+    if(copyonwrite(p->pagetable, r_stval()) != 0) {
+      printf("scause=%p pid=%d\n", r_scause(), p->pid);
+      printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+      panic("usertrap");
+  }
+
   usertrapret();
 }
 
@@ -153,6 +160,13 @@ kerneltrap()
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
 
+  if(which_dev == 3)
+    if(copyonwrite(myproc()->pagetable, r_stval()) != 0) {
+      printf("scause %p\n", scause);
+      printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+      panic("kerneltrap");
+  }
+
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.
   w_sepc(sepc);
@@ -206,6 +220,9 @@ devintr()
     w_sip(r_sip() & ~2);
 
     return 2;
+  } else if(scause == 0x000000000000000cL || scause == 0x000000000000000dL ||
+            scause == 0x000000000000000fL) {
+    return 3;
   } else {
     return 0;
   }
