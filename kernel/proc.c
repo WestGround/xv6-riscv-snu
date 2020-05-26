@@ -174,6 +174,7 @@ printf("create PT finished\n");
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
+printf("freepagetable called from %d\n", myproc()->pid);
   uvmunmap(pagetable, TRAMPOLINE, PGSIZE, 0);
   uvmunmap(pagetable, TRAPFRAME, PGSIZE, 0);
   if(sz > 0)
@@ -183,6 +184,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   else
     freewalk(pagetable);
 #endif
+printf("freepagetable exit\n");
 }
 
 // a user program that calls exec("/init")

@@ -196,9 +196,10 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
     if(do_free){
       pa = PTE2PA(*pte);
       kfree((void*)pa);
-    }
+    } else {
+      decrementref(PTE2PA(*pte));
+    }    
     *pte = 0;
-    decrementref(PTE2PA(*pte));
     if(a == last)
       break;
     a += PGSIZE;
@@ -368,21 +369,33 @@ uvmclear(pagetable_t pagetable, uint64 va)
 int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
+  pte_t* pte;
   uint64 n, va0, pa0;
+  int flags;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if((pte = walk(pagetable, va0, 0)) == 0)
       return -1;
-    n = PGSIZE - (dstva - va0);
-    if(n > len)
-      n = len;
-    memmove((void *)(pa0 + (dstva - va0)), src, n);
+    pa0 = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    //pa0 = walkaddr(pagetable, va0);
+    //if(pa0 == 0)
+    //  return -1;
+    if(flags&PTE_W) {
+      n = PGSIZE - (dstva - va0);
+      if(n > len)
+        n = len;
+      memmove((void *)(pa0 + (dstva - va0)), src, n);
 
-    len -= n;
-    src += n;
-    dstva = va0 + PGSIZE;
+      len -= n;
+      src += n;
+      dstva = va0 + PGSIZE;
+    } else {
+      copyonwrite(pagetable, va0);
+      if(copyout(pagetable, dstva, src, len) != 0)
+        return -1;
+    }
   }
   return 0;
 }

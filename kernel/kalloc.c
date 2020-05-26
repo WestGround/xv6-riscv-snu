@@ -63,7 +63,7 @@ kfree(void *pa)
   acquire(&kmem.lock);
   if(kmem.pgref[PGINDEX(pa)] < 0)
     panic("kfree");
-printf("kfree called with pa=%p\n", pa);
+printf("kfree called with pa=%p, ref=%d\n", pa, kmem.pgref[PGINDEX(pa)]);
   kmem.pgref[PGINDEX(pa)]--;
   if(kmem.pgref[PGINDEX(pa)] == 0) {
     // Fill with junk to catch dangling refs.
@@ -74,9 +74,9 @@ printf("kfree called with pa=%p\n", pa);
   #ifdef SNU
     freemem++;
   #endif
-printf("fully freed pa=%p\n", pa);
+printf("fully freed pa=%p, ref=%d\n", pa, kmem.pgref[PGINDEX(pa)]);
   } else {
-    printf("not fully freed pa=%p\n", pa);
+    printf("not fully freed pa=%p, ref=%d\n", pa, kmem.pgref[PGINDEX(pa)]);
   }
   release(&kmem.lock);
 }
