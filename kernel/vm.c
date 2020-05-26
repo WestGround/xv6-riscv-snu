@@ -153,7 +153,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
   uint64 a, last;
   pte_t *pte;
-
+printf("mappage called with va=%p to pa=%p\n", va, pa);
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
@@ -168,7 +168,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     a += PGSIZE;
     pa += PGSIZE;
   }
-
+printf("mappage finished\n");
   return 0;
 }
 
@@ -326,7 +326,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -336,11 +335,13 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     *pte = *pte & ~PTE_W;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-
+printf("uvmcopy: original va=%p, pa=%p\n", i, pa);
+printf("         flags R=%d W=%d X=%d\n", flags&PTE_R, flags&PTE_W, flags&PTE_X);
     if(mappages(new, i, PGSIZE, pa, flags) != 0) {
       goto err;
     }
   }
+printf("exit uvmcopy\n");
   return 0;
 
  err:
@@ -464,7 +465,7 @@ copyonwrite(pagetable_t pagetable, uint64 va) {
   a = PGROUNDDOWN(va);
   if((pte = walk(pagetable, a, 0)) == 0)
     return -1;
-  if(!(*pte & PTE_V)) //invalid
+  if(!(*pte & PTE_V) || *pte & PTE_X) //invalid
     return -2; 
   if(*pte & PTE_W)
     return -1;

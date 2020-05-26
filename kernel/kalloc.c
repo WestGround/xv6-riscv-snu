@@ -44,7 +44,7 @@ freerange(void *pa_start, void *pa_end)
     acquire(&kmem.lock);
     kmem.pgref[PGINDEX(p)] = 1;
     release(&kmem.lock);
-    kfree(p);
+    kkfree(p);
   }
 }
 
@@ -63,7 +63,7 @@ kfree(void *pa)
   acquire(&kmem.lock);
   if(kmem.pgref[PGINDEX(pa)] < 0)
     panic("kfree");
-
+printf("kfree called with pa=%p\n", pa);
   kmem.pgref[PGINDEX(pa)]--;
   if(kmem.pgref[PGINDEX(pa)] == 0) {
     // Fill with junk to catch dangling refs.
@@ -74,6 +74,9 @@ kfree(void *pa)
   #ifdef SNU
     freemem++;
   #endif
+printf("fully freed pa=%p\n", pa);
+  } else {
+    printf("not fully freed pa=%p\n", pa);
   }
   release(&kmem.lock);
 }
@@ -95,6 +98,7 @@ kalloc(void)
     kmem.pgref[PGINDEX(r)] = 0;
     kmem.freelist = r->next;
     freemem--;
+printf("kalloc returned with pa=%p, ref=%d\n", r, kmem.pgref[PGINDEX(r)]);
   }
 #else
   {
@@ -130,4 +134,30 @@ getref(uint64 pa) {
   ref = kmem.pgref[PGINDEX(pa)];
   release(&kmem.lock);
   return ref;
+}
+
+void
+kkfree(void *pa)
+{
+  struct run *r;
+
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+    panic("kfree");  
+
+  acquire(&kmem.lock);
+  if(kmem.pgref[PGINDEX(pa)] < 0)
+    panic("kfree");
+
+  kmem.pgref[PGINDEX(pa)]--;
+  if(kmem.pgref[PGINDEX(pa)] == 0) {
+    // Fill with junk to catch dangling refs.
+    memset(pa, 1, PGSIZE);
+    r = (struct run*)pa;
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+  #ifdef SNU
+    freemem++;
+  #endif
+  }
+  release(&kmem.lock);
 }

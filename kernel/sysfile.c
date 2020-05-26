@@ -431,6 +431,7 @@ sys_exec(void)
       break;
     }
     argv[i] = kalloc();
+    incrementref((uint64)argv[i]);
     if(argv[i] == 0)
       panic("sys_exec kalloc");
     if(fetchstr(uarg, argv[i], PGSIZE) < 0){
@@ -440,8 +441,9 @@ sys_exec(void)
 
   int ret = exec(path, argv);
 
-  for(i = 0; i < NELEM(argv) && argv[i] != 0; i++)
+  for(i = 0; i < NELEM(argv) && argv[i] != 0; i++) {
     kfree(argv[i]);
+  }
 
   return ret;
 
