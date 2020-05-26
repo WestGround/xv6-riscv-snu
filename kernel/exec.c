@@ -20,11 +20,9 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-printf("begin exec to run %s\n", path);
   begin_op();
 
   if((ip = namei(path)) == 0){
-printf("exit exec\n");
     end_op();
     return -1;
   }
@@ -40,7 +38,6 @@ printf("exit exec\n");
 
   // Load program into memory.
   sz = 0;
-printf("exec %s: load program into memory\n", path);
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -53,7 +50,6 @@ printf("exec %s: load program into memory\n", path);
     flags = (ph.flags & (1<<2)) ? PTE_R : 0;
     flags = flags | ((ph.flags & (1<<1)) ? PTE_W : 0);
     flags = flags | ((ph.flags & (1<<0)) ? PTE_X : 0);
-printf("   sz=%p, flags=%d\n", sz, flags);
     if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags|PTE_U)) == 0)
       goto bad;
 #ifndef SNU
@@ -63,7 +59,6 @@ printf("   sz=%p, flags=%d\n", sz, flags);
     if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;
   }
-printf("exec load finished\n");
   iunlockput(ip);
   end_op();
   ip = 0;
@@ -73,14 +68,12 @@ printf("exec load finished\n");
 
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
-printf("allocate two pages at boundary sz=%p\n", sz);
   sz = PGROUNDUP(sz);
   if((sz = uvmalloc(pagetable, sz, sz + 2*PGSIZE, PTE_R|PTE_W|PTE_U)) == 0)
     goto bad;
   uvmclear(pagetable, sz-2*PGSIZE);
   sp = sz;
   stackbase = sp - PGSIZE;
-printf("push argument strings - copyout included\n");
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -94,7 +87,6 @@ printf("push argument strings - copyout included\n");
     ustack[argc] = sp;
   }
   ustack[argc] = 0;
-printf("push the array of argv[] ptr - copyout included\n");
   // push the array of argv[] pointers.
   sp -= (argc+1) * sizeof(uint64);
   sp -= sp % 16;

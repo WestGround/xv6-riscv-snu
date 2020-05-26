@@ -91,7 +91,6 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
-printf("allocproc start\n");
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -119,7 +118,6 @@ found:
   memset(&p->context, 0, sizeof p->context);
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-printf("allocproc end\n");
   return p;
 }
 
@@ -151,21 +149,17 @@ pagetable_t
 proc_pagetable(struct proc *p)
 {
   pagetable_t pagetable;
-printf("creat PT start from pid=%d\n", p->pid);
   // An empty page table.
   pagetable = uvmcreate();
-printf("map trampoline for newly created one\n");
   // map the trampoline code (for system call return)
   // at the highest user virtual address.
   // only the supervisor uses it, on the way
   // to/from user space, so not PTE_U.
   mappages(pagetable, TRAMPOLINE, PGSIZE,
            (uint64)trampoline, PTE_R | PTE_X);
-printf("map trapframe for newly created one\n");
   // map the trapframe just below TRAMPOLINE, for trampoline.S.
   mappages(pagetable, TRAPFRAME, PGSIZE,
            (uint64)(p->tf), PTE_R | PTE_W);
-printf("create PT finished\n");
   return pagetable;
 }
 
@@ -174,7 +168,6 @@ printf("create PT finished\n");
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
-printf("freepagetable called from %d\n", myproc()->pid);
   uvmunmap(pagetable, TRAMPOLINE, PGSIZE, 0);
   uvmunmap(pagetable, TRAPFRAME, PGSIZE, 0);
   if(sz > 0)
@@ -184,7 +177,6 @@ printf("freepagetable called from %d\n", myproc()->pid);
   else
     freewalk(pagetable);
 #endif
-printf("freepagetable exit\n");
 }
 
 // a user program that calls exec("/init")
@@ -232,7 +224,6 @@ growproc(int n)
 {
   uint sz;
   struct proc *p = myproc();
-printf("growproc called from pid=%d\n", p->pid);
   sz = p->sz;
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_R|PTE_W|PTE_U)) == 0) {
@@ -242,7 +233,6 @@ printf("growproc called from pid=%d\n", p->pid);
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   p->sz = sz;
-  printf("growproc exit\n");
   return 0;
 }
 
@@ -254,7 +244,6 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
-  printf("fork called from pid=%d\n", p->pid);
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -289,7 +278,6 @@ fork(void)
   np->state = RUNNABLE;
 
   release(&np->lock);
-printf("fork exit\n");
   return pid;
 }
 
