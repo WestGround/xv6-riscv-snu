@@ -469,7 +469,7 @@ copyonwrite(pagetable_t pagetable, uint64 va) {
 
   a = PGROUNDDOWN(va);
   if((pte = walk(pagetable, a, 0)) == 0)
-    return -1;
+    return -2;
   if(!(*pte & PTE_V) || *pte & PTE_X) //invalid
     return -2; 
   if(*pte & PTE_W)
