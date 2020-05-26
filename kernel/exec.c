@@ -20,16 +20,13 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-printf("begin exec to run %s\n", path);
   begin_op();
 
   if((ip = namei(path)) == 0){
-printf("exit exec\n");
     end_op();
     return -1;
   }
   ilock(ip);
-printf("exec continue\n");
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;

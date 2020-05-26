@@ -82,7 +82,6 @@ usertrap(void)
     yield();
 
   if(which_dev == 3) {
-    printf("user trap from %d, va=%p\n", p->pid, r_stval());
     cow = copyonwrite(p->pagetable, r_stval());
     if(cow == -1) {
       printf("scause=%p pid=%d\n", r_scause(), p->pid);
