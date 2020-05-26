@@ -83,6 +83,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     } else {
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
+      // allocate new page for invalid address walk
       incrementref((uint64)pagetable);
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;
@@ -161,6 +162,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     if(*pte & PTE_V)
       panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
+    // After mapping va to given pa, increment reference to pa
     incrementref(pa);
     if(a == last)
       break;
@@ -193,8 +195,9 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       panic("uvmunmap: not a leaf");
     if(do_free){
       pa = PTE2PA(*pte);
-      kfree((void*)pa);
+      kfree((void*)pa); // reference to pa is decremented in kfree
     } else {
+      // decrement reference to pa without freeing
       decrementref(PTE2PA(*pte));
     }    
     *pte = 0;
@@ -331,6 +334,9 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
+    // Instead of allocating new physical memory frame,
+    // make another mapping to original phsical frame
+    // from the new pagetable with turning off PTE_W
     *pte = *pte & ~PTE_W;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
@@ -374,6 +380,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
       return -1;
     pa0 = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
+    // copyout to page without write persmission requires
+    // copy on write to allocate new page and copyout again
     if(flags&PTE_W) {
       n = PGSIZE - (dstva - va0);
       if(n > len)
@@ -460,6 +468,9 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
+// Do copy on write for the write instruction on unwritable page
+// Write on invalid page or executable page returns -2 (invalid)
+// and other errors return -1
 int
 copyonwrite(pagetable_t pagetable, uint64 va) {
   pte_t *pte;

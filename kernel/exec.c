@@ -74,6 +74,7 @@ exec(char *path, char **argv)
   uvmclear(pagetable, sz-2*PGSIZE);
   sp = sz;
   stackbase = sp - PGSIZE;
+
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -87,6 +88,7 @@ exec(char *path, char **argv)
     ustack[argc] = sp;
   }
   ustack[argc] = 0;
+  
   // push the array of argv[] pointers.
   sp -= (argc+1) * sizeof(uint64);
   sp -= sp % 16;

@@ -190,7 +190,8 @@ clockintr()
 
 // check if it's an external interrupt or software interrupt,
 // and handle it.
-// returns 2 if timer interrupt,
+// returns 3 if page fault,
+// 2 if timer interrupt,
 // 1 if other device,
 // 0 if not recognized.
 int
