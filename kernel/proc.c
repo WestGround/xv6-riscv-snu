@@ -71,6 +71,21 @@ myproc(void) {
   return p;
 }
 
+struct proc*
+getproc(int pid) {
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(pid == p->pid) {
+      release(&p->lock);
+      return p;
+    }
+    release(&p->lock);
+  }
+  return 0;
+}
+
 int
 allocpid() {
   int pid;
@@ -138,7 +153,7 @@ freeproc(struct proc *p)
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
-  p->prio = -1;
+  p->prio = PRIO_INIT;
   p->parent = 0;
   p->name[0] = 0;
   p->arg = 0;
@@ -610,15 +625,29 @@ sleep(void *chan, struct spinlock *lk)
 void
 wakeup(void *chan)
 {
-  struct proc *p;
+  struct proc *p, *nextproc;
+  int min_pri;
 
+  nextproc = proc;
+  min_pri = PRIO_INIT;
   for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state == SLEEPING && p->chan == chan && p->prio < min_pri) {
+      nextproc = p;
+      min_pri = p->prio;
+    }
+    release(&p->lock);
+  }
+  acquire(&nextproc->lock);
+  nextproc->state = RUNNABLE;
+  release(&nextproc->lock);
+  /*for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
     }
     release(&p->lock);
-  }
+  } */
 }
 
 // Wake up p if it is sleeping in wait(); used by exit().

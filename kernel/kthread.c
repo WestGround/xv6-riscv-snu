@@ -62,7 +62,7 @@ kthread_exit(void)
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
-  p->prio = -1;
+  p->prio = PRIO_INIT;
   p->parent = 0;
   p->name[0] = 0;
   p->chan = 0;
@@ -105,6 +105,27 @@ int
 kthread_get_prio(void)
 {
   return myproc()->prio;
+}
+
+int
+kthread_set_prio_with_pid(int pid, int newprio) {
+  struct proc *p = getproc(pid);
+  if(!p)
+    return -1;
+
+  acquire(&p->lock);
+  p->prio = newprio;
+  release(&p->lock);
+  return 0;
+}
+
+int
+kthread_get_prio_with_pid(int pid) {
+  struct proc *p = getproc(pid);
+  if(!p)
+    return -1;
+
+  return p->prio;
 }
 #endif
 

@@ -91,6 +91,7 @@ int             kill(int);
 struct cpu*     mycpu(void);
 struct cpu*     getmycpu(void);
 struct proc*    myproc();
+struct proc*    getproc(int);
 void            procinit(void);
 void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
@@ -188,6 +189,7 @@ void            virtio_disk_intr();
 #define USER_MAX_PRIO   139
 #define USER_DEF_PRIO   120       // default user process priority
 #define KERN_DEF_PRIO   50        // default kernel thread priority
+#define PRIO_INIT       (USER_MAX_PRIO + 1)
 
 void            kthreadret(void);
 int             kthread_create(const char *, int, void (*)(void *), void *);
@@ -195,6 +197,8 @@ void            kthread_exit(void);
 void            kthread_yield(void);
 void            kthread_set_prio(int);
 int             kthread_get_prio(void);
+int             kthread_set_prio_with_pid(int, int);
+int             kthread_get_prio_with_pid(int);
 int             kthtest(int);
 #endif
 
