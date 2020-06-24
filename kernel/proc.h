@@ -21,6 +21,7 @@ struct context {
 // Per-CPU state.
 struct cpu {
   struct proc *proc;          // The process running on this cpu, or null.
+  struct proc *latestproc;
   struct context scheduler;   // swtch() here to enter scheduler().
   int noff;                   // Depth of push_off() nesting.
   int intena;                 // Were interrupts enabled before push_off()?
@@ -93,6 +94,7 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
+  int prio;                    // Priority of the task
 
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Bottom of kernel stack for this process
@@ -103,4 +105,6 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  void *arg;
+  void (*fn)(void*);
 };

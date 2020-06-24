@@ -104,6 +104,7 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->prio = USER_DEF_PRIO;
 
   // Allocate a trapframe page.
   if((p->tf = (struct trapframe *)kalloc()) == 0){
@@ -137,8 +138,11 @@ freeproc(struct proc *p)
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
+  p->prio = -1;
   p->parent = 0;
   p->name[0] = 0;
+  p->arg = 0;
+  p->fn = 0;
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
@@ -200,6 +204,7 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
+  mycpu()->latestproc = p;
   
   // allocate one user page and copy init's instructions
   // and data into it.
@@ -283,6 +288,33 @@ fork(void)
   release(&np->lock);
 
   return pid;
+}
+
+struct proc*
+allockthread(void (*fn)(void*), void *arg) {
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state == UNUSED) {
+      goto found;
+    } else {
+      release(&p->lock);
+    }
+  }
+  return 0;
+
+found:
+  p->pid = allocpid();
+  p->pagetable = (uint64*)r_satp();
+
+  memset(&p->context, 0, sizeof p->context);
+  p->context.sp = p->kstack + PGSIZE;
+
+  p->parent = p;
+  p->state = RUNNABLE;
+
+  return p;
 }
 
 // Pass p's abandoned children to init.
@@ -441,30 +473,41 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p, *nextproc;
   struct cpu *c = mycpu();
+  int min_pri;
   
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->scheduler, &p->context);
+    nextproc = proc;
+    min_pri = USER_MAX_PRIO;
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+    for(p = c->latestproc+1; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && min_pri > p->prio) {
+        min_pri = p->prio;
+        nextproc = p;
       }
       release(&p->lock);
     }
+    for(p = proc; p <= c->latestproc; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && min_pri > p->prio) {
+        min_pri = p->prio;
+        nextproc = p;
+      }
+      release(&p->lock);
+    }
+
+    acquire(&nextproc->lock);
+    nextproc->state = RUNNING;
+    c->proc = nextproc;
+    swtch(&c->scheduler, &nextproc->context);
+    c->proc = 0;
+    release(&nextproc->lock);
   }
 }
 
@@ -491,6 +534,7 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
+  mycpu()->latestproc = p;
   swtch(&p->context, &mycpu()->scheduler);
   mycpu()->intena = intena;
 }
@@ -533,7 +577,7 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
-  
+
   // Must acquire p->lock in order to
   // change p->state and then call sched.
   // Once we hold p->lock, we can be

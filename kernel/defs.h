@@ -103,6 +103,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+struct proc*    allockthread(void (void*), void*);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -188,6 +189,7 @@ void            virtio_disk_intr();
 #define USER_DEF_PRIO   120       // default user process priority
 #define KERN_DEF_PRIO   50        // default kernel thread priority
 
+void            kthreadret(void);
 int             kthread_create(const char *, int, void (*)(void *), void *);
 void            kthread_exit(void);
 void            kthread_yield(void);
